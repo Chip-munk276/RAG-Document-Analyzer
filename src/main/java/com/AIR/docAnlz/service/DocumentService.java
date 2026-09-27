@@ -25,6 +25,14 @@ public class DocumentService {
                 .uploadedAt(LocalDateTime.now())
                 .build();
 
+        if (file.isEmpty()) {
+            throw new RuntimeException("Uploaded file is empty");
+        }
+
+        if (!"application/pdf".equals(file.getContentType())) {
+            throw new RuntimeException("Only PDF files are supported");
+        }
+
         return documentRepository.save(document);
     }
 
@@ -35,6 +43,8 @@ public class DocumentService {
     public Document getDocument(Long id) {
         return documentRepository.findById(id)
                 .orElseThrow(() ->
-                        new RuntimeException("Document not found"));
+                        new RuntimeException(
+                                "Document with ID " + id + " not found"
+                        ));
     }
 }
