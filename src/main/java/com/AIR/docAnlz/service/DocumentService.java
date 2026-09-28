@@ -6,8 +6,6 @@ import com.AIR.docAnlz.repository.DocumentRepository;
 import org.springframework.ai.document.DocumentReader;
 import org.springframework.ai.reader.pdf.PagePdfDocumentReader;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
-import org.springframework.ai.vectorstore.VectorStore;
-
 import org.springframework.core.io.InputStreamResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,17 +16,19 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.util.List;
+
 @Service
 public class DocumentService {
 
     private static final Logger logger =
             LoggerFactory.getLogger(DocumentService.class);
 
+    private final EmbeddingService embeddingService;
     private final DocumentRepository documentRepository;
-    private final VectorStore vectorStore;
-    public DocumentService(DocumentRepository documentRepository, VectorStore vectorStore) {
+
+    public DocumentService(DocumentRepository documentRepository, EmbeddingService embeddingService) {
         this.documentRepository = documentRepository;
-        this.vectorStore = vectorStore;
+        this.embeddingService = embeddingService;
     }
 
     public Document uploadDocument(MultipartFile file) throws IOException {
@@ -81,7 +81,7 @@ public class DocumentService {
                 splitter.apply(pages);
 
         //Store chunks + embeddings
-        vectorStore.add(chunks);
+        embeddingService.embedAndStore(chunks);
 
         return documentRepository.save(document);
     }
