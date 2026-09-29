@@ -33,14 +33,6 @@ public class DocumentService {
 
     public Document uploadDocument(MultipartFile file) throws IOException {
 
-        //Save Document Metadata
-        Document document = Document.builder()
-                .fileName(file.getOriginalFilename())
-                .fileType(file.getContentType())
-                .fileSize(file.getSize())
-                .uploadedAt(LocalDateTime.now())
-                .build();
-
         if (file.isEmpty()) {
             throw new RuntimeException("Uploaded file is empty");
         }
@@ -49,9 +41,18 @@ public class DocumentService {
             throw new RuntimeException("Only PDF files are supported");
         }
 
-        logger.info("Document uploaded successfully");
+        // Save Document Metadata first to get generated ID
+        Document document = Document.builder()
+                .fileName(file.getOriginalFilename())
+                .fileType(file.getContentType())
+                .fileSize(file.getSize())
+                .uploadedAt(LocalDateTime.now())
+                .build();
+        document = documentRepository.save(document);
 
-        //Parse PDF
+        logger.info("Document saved with ID: {}", document.getId());
+
+        // Parse PDF
         InputStream inputStream = file.getInputStream();
         InputStreamResource resource =
                 new InputStreamResource(inputStream);
@@ -60,15 +61,12 @@ public class DocumentService {
         List<org.springframework.ai.document.Document> pages =
                 reader.get();
 
-        //Add documentID as metadata
+        // Add metadata to pages
         for (org.springframework.ai.document.Document page : pages) {
-            page.getMetadata().put(
-                    "documentId",
-                    document.getId()
-            );
+            page.getMetadata().put("documentID", document.getId());
         }
 
-        //Chunking
+        // Chunking
         TokenTextSplitter splitter = TokenTextSplitter.builder()
                 .withChunkSize(500)
                 .withMinChunkSizeChars(100)
@@ -80,10 +78,15 @@ public class DocumentService {
         List<org.springframework.ai.document.Document> chunks =
                 splitter.apply(pages);
 
-        //Store chunks + embeddings
+        //Ensure metadata is preserved on all chunks
+        for (org.springframework.ai.document.Document chunk : chunks) {
+            chunk.getMetadata().put("documentId", document.getId());
+        }
+
+        // Store chunks + embeddings
         embeddingService.embedAndStore(chunks);
 
-        return documentRepository.save(document);
+        return document;
     }
 
     public List<Document> getAllDocuments() {
