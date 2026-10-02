@@ -42,7 +42,7 @@ public class ChatService {
             List<Document> relevantChunks = vectorStore.similaritySearch(
                     SearchRequest.builder()
                             .query(question)
-                            .topK(5)
+                            .topK(15)
                             .filterExpression(b.eq("documentId", documentId).build())
                             .build()
             );

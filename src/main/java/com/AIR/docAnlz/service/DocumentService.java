@@ -63,7 +63,7 @@ public class DocumentService {
 
         // Add metadata to pages
         for (org.springframework.ai.document.Document page : pages) {
-            page.getMetadata().put("documentID", document.getId());
+            page.getMetadata().put("documentId", document.getId());
         }
 
         // Chunking

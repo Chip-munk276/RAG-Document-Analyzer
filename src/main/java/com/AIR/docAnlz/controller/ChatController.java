@@ -6,6 +6,7 @@ import com.AIR.docAnlz.service.ChatService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/documents")
 public class ChatController {
