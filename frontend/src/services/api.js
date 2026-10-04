@@ -9,6 +9,60 @@ export const setMockMode = (enabled) => {
 
 export const getMockMode = () => isMockMode;
 
+// Authentication Token Management
+export const setAuthToken = (token) => {
+  if (token) {
+    localStorage.setItem('jwt_token', token);
+  } else {
+    localStorage.removeItem('jwt_token');
+  }
+};
+
+export const getAuthToken = () => localStorage.getItem('jwt_token');
+
+export const getAuthHeaders = (extraHeaders = {}) => {
+  const token = getAuthToken();
+  const headers = { ...extraHeaders };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+};
+
+export const loginUser = async (email, password) => {
+  const res = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password })
+  });
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(errorText || 'Login failed');
+  }
+  const data = await res.json();
+  if (data.token) {
+    setAuthToken(data.token);
+  }
+  return data;
+};
+
+export const registerUser = async (email, password) => {
+  const res = await fetch('/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password })
+  });
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(errorText || 'Registration failed');
+  }
+  const data = await res.json();
+  if (data.token) {
+    setAuthToken(data.token);
+  }
+  return data;
+};
+
 // Mock database in memory
 let MOCK_DOCUMENTS = [
   {
@@ -79,7 +133,9 @@ export const fetchDocuments = async () => {
   }
 
   try {
-    const res = await fetch('/api/documents');
+    const res = await fetch('/api/documents', {
+      headers: getAuthHeaders()
+    });
     if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
     const data = await res.json();
     return data.map(doc => ({
@@ -143,6 +199,7 @@ export const uploadPDFDocument = async (file, onProgress) => {
 
   const res = await fetch('/api/documents/upload', {
     method: 'POST',
+    headers: getAuthHeaders(),
     body: formData,
   });
 
@@ -161,7 +218,10 @@ export const deleteDocument = async (id) => {
   }
 
   try {
-    const res = await fetch(`/api/documents/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/documents/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
     if (!res.ok) throw new Error('Failed to delete document');
     return true;
   } catch (err) {
@@ -215,7 +275,7 @@ export const sendChatMessage = async (documentId, question) => {
   try {
     const res = await fetch(`/api/documents/${documentId}/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ question })
     });
 

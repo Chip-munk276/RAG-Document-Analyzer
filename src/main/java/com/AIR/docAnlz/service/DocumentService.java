@@ -1,7 +1,10 @@
 package com.AIR.docAnlz.service;
 
 import com.AIR.docAnlz.model.Document;
+import com.AIR.docAnlz.model.User;
 import com.AIR.docAnlz.repository.DocumentRepository;
+import com.AIR.docAnlz.repository.UserRepository;
+import com.AIR.docAnlz.security.CurrentUserService;
 
 import org.springframework.ai.document.DocumentReader;
 import org.springframework.ai.reader.pdf.PagePdfDocumentReader;
@@ -25,13 +28,32 @@ public class DocumentService {
 
     private final EmbeddingService embeddingService;
     private final DocumentRepository documentRepository;
+    private final UserRepository userRepository;
+    private final CurrentUserService currentUserService;
 
-    public DocumentService(DocumentRepository documentRepository, EmbeddingService embeddingService) {
+    public DocumentService(DocumentRepository documentRepository,
+                           EmbeddingService embeddingService,
+                           UserRepository userRepository,
+                           CurrentUserService currentUserService
+    ) {
         this.documentRepository = documentRepository;
         this.embeddingService = embeddingService;
+        this.userRepository = userRepository;
+        this.currentUserService = currentUserService;
     }
 
     public Document uploadDocument(MultipartFile file) throws IOException {
+
+        Long userId =
+                currentUserService.getCurrentUserId();
+
+        User user =
+                userRepository.findById(userId)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "User not found"
+                                )
+                        );
 
         if (file.isEmpty()) {
             throw new RuntimeException("Uploaded file is empty");
@@ -47,6 +69,7 @@ public class DocumentService {
                 .fileType(file.getContentType())
                 .fileSize(file.getSize())
                 .uploadedAt(LocalDateTime.now())
+                .owner(user)
                 .build();
         document = documentRepository.save(document);
 
@@ -91,13 +114,26 @@ public class DocumentService {
 
     public List<Document> getAllDocuments() {
         logger.info("Fetching all documents");
-        return documentRepository.findAll();
+        Long userId =
+                currentUserService.getCurrentUserId();
+
+        return documentRepository
+                .findAllByOwnerIdOrderByUploadedAtDesc(
+                        userId
+                );
     }
 
     public Document getDocument(Long id) {
 
         logger.info("Fetching document with ID: {}", id);
-        return documentRepository.findById(id)
+        Long userId =
+                currentUserService.getCurrentUserId();
+
+        return documentRepository
+                .findByIdAndOwnerId(
+                        id,
+                        userId
+                )
                 .orElseThrow(() ->
                         new RuntimeException(
                                 "Document with ID " + id + " not found"
