@@ -2,6 +2,10 @@ package com.AIR.docAnlz.service;
 
 import com.AIR.docAnlz.dto.ChatResponse;
 
+import com.AIR.docAnlz.model.*;
+import com.AIR.docAnlz.repository.*;
+import com.AIR.docAnlz.security.CurrentUserService;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
@@ -23,20 +27,73 @@ public class ChatService {
     private final ChatClient chatClient;
     private final VectorStore vectorStore;
 
+    private final DocumentRepository documentRepository;
+    private final UserRepository userRepository;
+    private final ChatSessionRepository chatSessionRepository;
+    private final ChatMessageRepository chatMessageRepository;
+
+    private final CurrentUserService currentUserService;
+
     public ChatService(
             ChatClient.Builder chatClientBuilder,
-            VectorStore vectorStore
+            VectorStore vectorStore,
+            DocumentRepository documentRepository,
+            UserRepository userRepository,
+            ChatSessionRepository chatSessionRepository,
+            ChatMessageRepository chatMessageRepository,
+            CurrentUserService currentUserService
     ) {
         this.chatClient = chatClientBuilder.build();
         this.vectorStore = vectorStore;
+        this.documentRepository = documentRepository;
+        this.userRepository = userRepository;
+        this.chatSessionRepository = chatSessionRepository;
+        this.chatMessageRepository = chatMessageRepository;
+        this.currentUserService = currentUserService;
     }
+
     public ChatResponse chat(Long documentId, String question) {
 
         logger.info(
                 "Chat request received for document ID: {}",
                 documentId
         );
+
+        Long userId = currentUserService.getCurrentUserId();
+        com.AIR.docAnlz.model.Document document = documentRepository
+                .findByIdAndOwnerId(
+                        documentId,
+                        userId
+                )
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Document not found"
+                        )
+                );
+
+        User user = userRepository
+                .findById(userId)
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "User not found"
+                        )
+                );
+
+        ChatSession session =
+                chatSessionRepository
+                        .findFirstByUserIdAndDocumentIdOrderByCreatedAtAsc(
+                                userId,
+                                documentId
+                        )
+                        .orElseGet(() -> {
+                            ChatSession s = new ChatSession();
+                            s.setUser(user);
+                            s.setDocument(document);
+                            return chatSessionRepository.save(s);
+                        });
+
         String context = "";
+
         try {
             // Perform vector similarity search
             List<Document> relevantChunks = vectorStore.similaritySearch(
@@ -49,6 +106,13 @@ public class ChatService {
 
             // check if anything is found
             if (relevantChunks.isEmpty()) {
+
+                //Save chat
+                saveChatHistory(
+                        session,
+                        question,
+                        "I could not find relevant information in this document."
+                );
 
                 return new ChatResponse(
                         documentId,
@@ -71,25 +135,26 @@ public class ChatService {
             throw ex;
         }
 
+        String answer;
         //Send the retrieved context + question to the LLM
         try {
-            String answer = chatClient
+            answer = chatClient
                     .prompt()
                     .system("""
-                        You are an intelligent document analysis assistant.
-
-                        Answer the user's question using ONLY the
-                        information provided in the document context.
-
-                        If the answer cannot be found in the context,
-                        clearly state that the information is not available
-                        in the document.
-
-                        Do not invent facts.
-                        Do not use outside knowledge.
-
-                        DOCUMENT CONTEXT:
-                        """ + context)
+                            You are an intelligent document analysis assistant.
+                            
+                            Answer the user's question using ONLY the
+                            information provided in the document context.
+                            
+                            If the answer cannot be found in the context,
+                            clearly state that the information is not available
+                            in the document.
+                            
+                            Do not invent facts.
+                            Do not use outside knowledge.
+                            
+                            DOCUMENT CONTEXT:
+                            """ + context)
                     .user(question)
                     .call()
                     .content();
@@ -98,6 +163,14 @@ public class ChatService {
                     "Chat response generated for document ID: {}",
                     documentId
             );
+
+            //Save chat
+            saveChatHistory(
+                    session,
+                    question,
+                    answer
+            );
+
             //Return answer
             return new ChatResponse(
                     documentId,
@@ -112,5 +185,80 @@ public class ChatService {
             );
             throw e;
         }
+    }
+
+    //Save user question and assistant answer
+    private void saveChatHistory(
+            ChatSession session,
+            String question,
+            String answer
+    ) {
+
+        // USER message
+        ChatMessage userMessage = new ChatMessage();
+        userMessage.setSession(session);
+        userMessage.setRole(
+                MessageRole.USER
+        );
+        userMessage.setContent(
+                question
+        );
+        chatMessageRepository.save(
+                userMessage
+        );
+
+        // ASSISTANT message
+        ChatMessage assistantMessage = new ChatMessage();
+        assistantMessage.setSession(session);
+        assistantMessage.setRole(
+                MessageRole.ASSISTANT
+        );
+        assistantMessage.setContent(
+                answer
+        );
+        chatMessageRepository.save(
+                assistantMessage
+        );
+
+        logger.info(
+                "Chat history saved for session ID: {}",
+                session.getId()
+        );
+    }
+
+    // get chat history
+    public List<ChatMessage> getHistory(
+            Long documentId
+    ) {
+
+        Long userId = currentUserService.getCurrentUserId();
+
+        documentRepository
+                .findByIdAndOwnerId(
+                        documentId,
+                        userId
+                )
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Document not found"
+                        )
+                );
+
+        ChatSession session =
+                chatSessionRepository
+                        .findFirstByUserIdAndDocumentIdOrderByCreatedAtAsc(
+                                userId,
+                                documentId
+                        )
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Chat history not found"
+                                )
+                        );
+
+        return chatMessageRepository
+                .findAllBySessionIdOrderByCreatedAtAsc(
+                        session.getId()
+                );
     }
 }
