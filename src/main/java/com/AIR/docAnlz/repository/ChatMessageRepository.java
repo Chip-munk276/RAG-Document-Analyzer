@@ -13,4 +13,5 @@ public interface ChatMessageRepository
     findAllBySessionIdOrderByCreatedAtAsc(
             Long sessionId
     );
+    void deleteAllBySessionId(Long sessionId);
 }

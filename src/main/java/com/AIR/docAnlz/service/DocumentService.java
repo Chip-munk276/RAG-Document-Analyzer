@@ -1,9 +1,9 @@
 package com.AIR.docAnlz.service;
 
 import com.AIR.docAnlz.model.Document;
+import com.AIR.docAnlz.model.ChatSession;
 import com.AIR.docAnlz.model.User;
-import com.AIR.docAnlz.repository.DocumentRepository;
-import com.AIR.docAnlz.repository.UserRepository;
+import com.AIR.docAnlz.repository.*;
 import com.AIR.docAnlz.security.CurrentUserService;
 
 import org.springframework.ai.document.DocumentReader;
@@ -13,6 +13,7 @@ import org.springframework.core.io.InputStreamResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -30,16 +31,22 @@ public class DocumentService {
     private final DocumentRepository documentRepository;
     private final UserRepository userRepository;
     private final CurrentUserService currentUserService;
+    private final ChatMessageRepository chatMessageRepository;
+    private final ChatSessionRepository chatSessionRepository;
 
     public DocumentService(DocumentRepository documentRepository,
                            EmbeddingService embeddingService,
                            UserRepository userRepository,
-                           CurrentUserService currentUserService
+                           CurrentUserService currentUserService,
+                           ChatMessageRepository chatMessageRepository,
+                           ChatSessionRepository chatSessionRepository
     ) {
         this.documentRepository = documentRepository;
         this.embeddingService = embeddingService;
         this.userRepository = userRepository;
         this.currentUserService = currentUserService;
+        this.chatMessageRepository = chatMessageRepository;
+        this.chatSessionRepository = chatSessionRepository;
     }
 
     public Document uploadDocument(MultipartFile file) throws IOException {
@@ -138,5 +145,43 @@ public class DocumentService {
                         new RuntimeException(
                                 "Document with ID " + id + " not found"
                         ));
+    }
+
+    @Transactional
+    public void deleteDocument(Long documentId) {
+
+        Long userId = currentUserService.getCurrentUserId();
+
+        Document document =
+                documentRepository
+                        .findByIdAndOwnerId(
+                                documentId,
+                                userId
+                        )
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Document not found"
+                                )
+                        );
+
+        //Delete chat messages before their session.
+        ChatSession session = chatSessionRepository
+                .findFirstByUserIdAndDocumentIdOrderByCreatedAtAsc(
+                        userId,
+                        documentId
+                )
+                .orElse(null);
+
+        if (session != null) {
+            chatMessageRepository.deleteAllBySessionId(session.getId());
+            chatSessionRepository.delete(session);
+        }
+
+        //Direct SQL deletion of all document vectors.
+        int deletedVectors = embeddingService.deleteDocumentVectors(documentId);
+
+        documentRepository.delete(document);
+
+        logger.info("Document " + documentId + " deleted along with " + deletedVectors + " vector chunks");
     }
 }
