@@ -3,6 +3,7 @@ package com.AIR.docAnlz.service;
 import com.AIR.docAnlz.dto.AuthResponse;
 import com.AIR.docAnlz.dto.LoginRequest;
 import com.AIR.docAnlz.dto.RegisterRequest;
+import com.AIR.docAnlz.exception.UserAlreadyExistsException;
 import com.AIR.docAnlz.model.Role;
 import com.AIR.docAnlz.model.User;
 import com.AIR.docAnlz.repository.UserRepository;
@@ -31,7 +32,7 @@ public class AuthService {
     public AuthResponse register(RegisterRequest request) {
 
         if (userRepository.existsByEmail(request.email())) {
-            throw new RuntimeException("Email already registered");
+            throw new UserAlreadyExistsException("An account with this email already exists. Please sign in or use a different email.");
         }
 
         User user = new User(
