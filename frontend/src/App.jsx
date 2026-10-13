@@ -4,8 +4,16 @@ import UploadScreen from './components/UploadScreen';
 import DocumentDashboard from './components/DocumentDashboard';
 import ChatScreen from './components/ChatScreen';
 import SourceViewer from './components/SourceViewer';
+import AuthModal from './components/AuthModal';
 import { ToastNotification } from './components/ErrorAlert';
-import { fetchDocuments, deleteDocument, setMockMode, getMockMode } from './services/api';
+import { 
+  fetchDocuments, 
+  deleteDocument, 
+  setMockMode, 
+  getMockMode,
+  getCurrentUser,
+  logoutUser
+} from './services/api';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -13,6 +21,9 @@ export default function App() {
   const [selectedDocId, setSelectedDocId] = useState(null);
   const [isMockMode, setIsMockState] = useState(false);
   const [toast, setToast] = useState(null);
+  const [user, setUser] = useState(() => getCurrentUser());
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authInitialMode, setAuthInitialMode] = useState('login');
 
   // Source Viewer Drawer state
   const [sourceViewerData, setSourceViewerData] = useState({
@@ -30,25 +41,62 @@ export default function App() {
     try {
       const data = await fetchDocuments();
       setDocuments(data);
-      if (data.length > 0 && !selectedDocId) {
-        setSelectedDocId(data[0].id);
+      if (data.length > 0) {
+        setSelectedDocId(prev => prev && data.some(d => d.id === prev) ? prev : data[0].id);
+      } else {
+        setSelectedDocId(null);
       }
       setIsMockState(getMockMode());
     } catch (err) {
       console.error("Error fetching documents:", err);
-      showToast("Failed to fetch documents from server", "error");
+      if (err.message && err.message.includes('session has expired')) {
+        showToast("Session expired. Please sign in again.", "error");
+        setIsAuthModalOpen(true);
+      } else {
+        showToast("Unable to load documents from server", "error");
+      }
     }
   };
 
   useEffect(() => {
     loadDocs();
+
+    // Event listeners for session expiration or logout
+    const handleExpired = () => {
+      setUser(null);
+      showToast("Your session has expired. Please log in again.", "warning");
+      setIsAuthModalOpen(true);
+    };
+
+    const handleLoggedOut = () => {
+      setUser(null);
+    };
+
+    window.addEventListener('auth:expired', handleExpired);
+    window.addEventListener('auth:logout', handleLoggedOut);
+
+    return () => {
+      window.removeEventListener('auth:expired', handleExpired);
+      window.removeEventListener('auth:logout', handleLoggedOut);
+    };
   }, []);
 
-  const handleToggleMockMode = (enabled) => {
-    setMockMode(enabled);
-    setIsMockState(enabled);
+  const handleAuthSuccess = (userData) => {
+    setUser(userData);
+    showToast(`Authenticated as ${userData.email} (${userData.role || 'USER'})`, "success");
     loadDocs();
-    showToast(enabled ? "Switched to Demo Mode (Mock RAG Data)" : "Connected to Live Spring Boot Backend", "info");
+  };
+
+  const handleLogout = () => {
+    logoutUser();
+    setUser(null);
+    showToast("Signed out successfully", "info");
+    loadDocs();
+  };
+
+  const openAuthModal = (mode = 'login') => {
+    setAuthInitialMode(mode);
+    setIsAuthModalOpen(true);
   };
 
   const handleUploadSuccess = (newDoc) => {
@@ -61,14 +109,17 @@ export default function App() {
     const docToDelete = documents.find(d => d.id === id);
     if (!docToDelete) return;
 
-    if (window.confirm(`Are you sure you want to delete "${docToDelete.fileName}"?`)) {
+    try {
       await deleteDocument(id);
       const updated = documents.filter(d => d.id !== id);
       setDocuments(updated);
       if (selectedDocId === id) {
         setSelectedDocId(updated.length > 0 ? updated[0].id : null);
       }
-      showToast(`Deleted "${docToDelete.fileName}"`, "info");
+      showToast(`Document "${docToDelete.fileName}" and associated vector embeddings purged.`, "info");
+    } catch (err) {
+      console.error("Delete failed:", err);
+      showToast(`Failed to delete document: ${err.message}`, "error");
     }
   };
 
@@ -95,12 +146,17 @@ export default function App() {
         documents={documents}
         selectedDocId={selectedDocId}
         setSelectedDocId={setSelectedDocId}
+        user={user}
+        onOpenAuth={() => openAuthModal('login')}
+        onLogout={handleLogout}
       />
 
       {/* Main View Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto pb-12 z-10">
         {activeTab === 'upload' && (
           <UploadScreen
+            user={user}
+            onOpenAuth={() => openAuthModal('login')}
             onUploadSuccess={handleUploadSuccess}
             onNavigateToChat={(docId) => {
               setSelectedDocId(docId);
@@ -111,6 +167,8 @@ export default function App() {
 
         {activeTab === 'dashboard' && (
           <DocumentDashboard
+            user={user}
+            onOpenAuth={() => openAuthModal('login')}
             documents={documents}
             selectedDocId={selectedDocId}
             onSelectDoc={(id) => setSelectedDocId(id)}
@@ -125,13 +183,24 @@ export default function App() {
 
         {activeTab === 'chat' && (
           <ChatScreen
+            user={user}
+            onOpenAuth={() => openAuthModal('login')}
             documents={documents}
             selectedDocId={selectedDocId}
             setSelectedDocId={setSelectedDocId}
             onOpenSourceViewer={handleOpenSourceViewer}
+            onDeleteDoc={handleDeleteDocument}
           />
         )}
       </main>
+
+      {/* Authentication Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        initialMode={authInitialMode}
+        onAuthSuccess={handleAuthSuccess}
+      />
 
       {/* Slide-over Source Viewer Drawer */}
       <SourceViewer

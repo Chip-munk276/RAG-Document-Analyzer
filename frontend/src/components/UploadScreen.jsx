@@ -11,11 +11,13 @@ import {
   Zap, 
   FileCheck,
   RefreshCw,
-  X
+  X,
+  ShieldAlert,
+  LogIn
 } from 'lucide-react';
 import { uploadPDFDocument } from '../services/api';
 
-export default function UploadScreen({ onUploadSuccess, onNavigateToChat }) {
+export default function UploadScreen({ onUploadSuccess, onNavigateToChat, user, onOpenAuth }) {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
@@ -55,6 +57,13 @@ export default function UploadScreen({ onUploadSuccess, onNavigateToChat }) {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
+
+    // If user is not signed in, redirect to sign in instead of showing an error
+    if (!user) {
+      if (onOpenAuth) onOpenAuth();
+      return;
+    }
+
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
       if (validateFile(file)) {
@@ -64,6 +73,12 @@ export default function UploadScreen({ onUploadSuccess, onNavigateToChat }) {
   };
 
   const handleFileChange = (e) => {
+    // If user is not signed in, redirect to sign in instead of showing an error
+    if (!user) {
+      if (onOpenAuth) onOpenAuth();
+      return;
+    }
+
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       if (validateFile(file)) {
@@ -73,6 +88,12 @@ export default function UploadScreen({ onUploadSuccess, onNavigateToChat }) {
   };
 
   const handleStartUpload = async () => {
+    // If user is not signed in, redirect to sign in instead of showing an error
+    if (!user) {
+      if (onOpenAuth) onOpenAuth();
+      return;
+    }
+
     if (!selectedFile) return;
     setUploading(true);
     setProgress(0);
@@ -98,6 +119,11 @@ export default function UploadScreen({ onUploadSuccess, onNavigateToChat }) {
       setUploadedDoc(newDoc);
       if (onUploadSuccess) onUploadSuccess(newDoc);
     } catch (err) {
+      // If error is caused by authentication, redirect to sign in rather than showing error
+      if (!user || err.message?.includes('session has expired') || err.message?.includes('401') || err.message?.toLowerCase().includes('unauthorized') || err.message?.includes('Full authentication is required')) {
+        if (onOpenAuth) onOpenAuth();
+        return;
+      }
       setErrorMsg(err.message || 'Failed to process and index PDF document.');
     } finally {
       setUploading(false);
@@ -135,6 +161,22 @@ export default function UploadScreen({ onUploadSuccess, onNavigateToChat }) {
         <p className="text-sm text-slate-400 max-w-xl mx-auto">
           Upload any PDF report, research paper, or manual. Our system automatically parses pages, builds dense embeddings, and prepares your PDF for instant semantic retrieval.
         </p>
+
+        {!user && (
+          <div className="mt-4 p-3.5 rounded-xl bg-indigo-950/40 border border-indigo-500/30 flex items-center justify-between gap-3 text-xs text-left max-w-xl mx-auto animate-fade-in">
+            <div className="flex items-center gap-2 text-zinc-300">
+              <ShieldAlert className="h-4 w-4 text-indigo-400 flex-shrink-0" />
+              <span>Please sign in to upload and index documents with your private session.</span>
+            </div>
+            <button
+              onClick={onOpenAuth}
+              className="flex items-center gap-1 px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-semibold transition flex-shrink-0"
+            >
+              <LogIn className="h-3.5 w-3.5" />
+              <span>Sign In</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Error Alert Message */}
@@ -170,7 +212,14 @@ export default function UploadScreen({ onUploadSuccess, onNavigateToChat }) {
             onDragLeave={handleDrag}
             onDragOver={handleDrag}
             onDrop={handleDrop}
-            onClick={() => !uploading && inputRef.current?.click()}
+            onClick={() => {
+              if (uploading) return;
+              if (!user) {
+                if (onOpenAuth) onOpenAuth();
+                return;
+              }
+              inputRef.current?.click();
+            }}
             className={`border-2 border-dashed rounded-2xl p-8 sm:p-12 text-center transition-all duration-200 cursor-pointer ${
               dragActive
                 ? 'border-indigo-500 bg-indigo-500/10 scale-[1.01]'
@@ -184,16 +233,22 @@ export default function UploadScreen({ onUploadSuccess, onNavigateToChat }) {
             </div>
 
             <h3 className="text-lg font-semibold text-slate-200 mb-1">
-              {dragActive ? "Drop PDF file here" : "Click to select or drag & drop PDF"}
+              {dragActive 
+                ? "Drop PDF file here" 
+                : !user 
+                ? "Sign in to upload PDF documents" 
+                : "Click to select or drag & drop PDF"}
             </h3>
             
             <p className="text-xs text-slate-400 mb-4 max-w-sm mx-auto">
-              Strictly PDF format supported (.pdf up to 50MB)
+              {!user 
+                ? "Click here to sign in and start analyzing your PDF files" 
+                : "Strictly PDF format supported (.pdf up to 50MB)"}
             </p>
 
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-800 text-slate-300 text-xs font-medium">
-              <Upload className="h-3.5 w-3.5" />
-              <span>Browse PDF Files</span>
+              {!user ? <LogIn className="h-3.5 w-3.5 text-indigo-400" /> : <Upload className="h-3.5 w-3.5" />}
+              <span>{!user ? "Sign In to Upload" : "Browse PDF Files"}</span>
             </span>
           </div>
 
