@@ -27,7 +27,7 @@ public class CurrentUserService {
 
         if (userId == null) {
             throw new IllegalStateException(
-                    "JWT does not contain userId"
+                    "User session does not contain userId"
             );
         }
 
