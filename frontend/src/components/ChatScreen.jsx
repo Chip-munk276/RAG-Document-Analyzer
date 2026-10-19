@@ -84,10 +84,10 @@ export default function ChatScreen({
           sources: []
         }));
         setMessages(mapped);
-        setHistoryCount(mapped.length);
+        //setHistoryCount(mapped.length);
       } else {
         setMessages([getWelcomeMessage(activeDoc)]);
-        setHistoryCount(0);
+        //setHistoryCount(0);
       }
     } catch (err) {
       console.warn("Could not load chat history:", err);
@@ -101,7 +101,7 @@ export default function ChatScreen({
           timestamp: formatMessageTime()
         }
       ]);
-      setHistoryCount(0);
+      //setHistoryCount(0);
     } finally {
       setLoadingHistory(false);
     }
@@ -242,7 +242,7 @@ export default function ChatScreen({
             >
               <RotateCcw className={`h-3.5 w-3.5 ${loadingHistory ? 'animate-spin text-indigo-400' : ''}`} />
               <span className="hidden md:inline">
-                {loadingHistory ? 'Syncing...' : historyCount > 0 ? `History (${historyCount})` : 'Sync History'}
+                {loadingHistory ? 'Syncing...' : 'Sync History'}
               </span>
             </button>
           )}
@@ -353,12 +353,6 @@ export default function ChatScreen({
                   <Clock className="h-3 w-3" />
                   <span>{msg.timestamp}</span>
                 </div>
-
-                {msg.isHistory && (
-                  <span className="px-1.5 py-0.2 bg-neutral-900 border border-neutral-800 text-indigo-400 rounded text-[9px] font-medium">
-                    Restored History
-                  </span>
-                )}
                 
                 {msg.sender === 'bot' && !msg.isError && (
                   <>

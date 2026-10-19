@@ -144,8 +144,6 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         documents={documents}
-        selectedDocId={selectedDocId}
-        setSelectedDocId={setSelectedDocId}
         user={user}
         onOpenAuth={() => openAuthModal('login')}
         onLogout={handleLogout}

@@ -92,19 +92,6 @@ export default function DocumentDashboard({
             Manage vector-indexed PDF documents ready for semantic search & retrieval.
           </p>
         </div>
-        <button
-          onClick={() => {
-            if (!user) {
-              onOpenAuth();
-            } else {
-              onNavigateToUpload();
-            }
-          }}
-          className="self-start md:self-auto flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/20 transition"
-        >
-          <FileText className="h-4 w-4" />
-          <span>+ Upload New PDF</span>
-        </button>
       </div>
 
       {/* Metrics Row */}
@@ -126,7 +113,7 @@ export default function DocumentDashboard({
         </div>
       </div>
 
-      {/* Filter & Search Bar */}
+      {/* Search Bar */}
       <div className="glass-panel p-4 rounded-2xl border border-neutral-800 flex flex-col sm:flex-row items-center justify-between gap-4">
         
         {/* Search Input */}
@@ -139,23 +126,6 @@ export default function DocumentDashboard({
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full bg-neutral-900 border border-neutral-800 rounded-xl pl-9 pr-4 py-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
           />
-        </div>
-
-        {/* Status Pills */}
-        <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
-          {['ALL', 'INDEXED', 'PROCESSING', 'FAILED'].map(status => (
-            <button
-              key={status}
-              onClick={() => setStatusFilter(status)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
-                statusFilter === status
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'bg-neutral-900 text-zinc-400 hover:text-zinc-200 border border-neutral-800 hover:bg-neutral-800'
-              }`}
-            >
-              {status}
-            </button>
-          ))}
         </div>
       </div>
 

@@ -368,25 +368,6 @@ export default function UploadScreen({ onUploadSuccess, onNavigateToChat, user, 
         </div>
       )}
 
-      {/* Feature Highlights Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8">
-        <div className="p-4 rounded-xl glass-card border border-slate-800/80">
-          <FileText className="h-5 w-5 text-indigo-400 mb-2" />
-          <h4 className="text-xs font-semibold text-slate-200">Native PDF Layout Parser</h4>
-          <p className="text-[11px] text-slate-400 mt-1">Extracts clean page numbers, tables, and headers preserving exact document layout.</p>
-        </div>
-        <div className="p-4 rounded-xl glass-card border border-slate-800/80">
-          <Cpu className="h-5 w-5 text-purple-400 mb-2" />
-          <h4 className="text-xs font-semibold text-slate-200">Dense Vector Embeddings</h4>
-          <p className="text-[11px] text-slate-400 mt-1">Generates multi-dimensional text embeddings for context-aware semantic search.</p>
-        </div>
-        <div className="p-4 rounded-xl glass-card border border-slate-800/80">
-          <Database className="h-5 w-5 text-emerald-400 mb-2" />
-          <h4 className="text-xs font-semibold text-slate-200">Interactive Page Citations</h4>
-          <p className="text-[11px] text-slate-400 mt-1">Every AI response includes clickable PDF source chips with page context preview.</p>
-        </div>
-      </div>
-
     </div>
   );
 }
